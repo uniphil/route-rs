@@ -50,19 +50,27 @@ macro_rules! split {
     );
 }
 
-macro_rules! route {
-    ( $s:ident, $( $path:tt => $handle:expr ; )* ) => ({
-        let mut p;
-        $(
-            loop {
-                p = 0;
-                split!($s, p, $path);
+macro_rules! route_fn {
+    ( $f:ident -> $o:ident {
+        $( $m:tt => $handle:expr , )*
+    }, $def:path ) => (
+        fn $f(path: &str) -> $o {
+            $(loop {
+                let mut p = 0;
+                split!(path, p, $m);
                 return $handle;
-            }
-        )*
-    });
+            })*
+            $def
+        }
+    );
+    ( $f:ident -> $o:ident {
+        $( $m:tt => $handle:expr ), *    // missing trailing comma
+    }, $def:path ) => (
+        route_fn!($f -> $o {
+            $( $m => $handle , )*
+        }, $def)
+    )
 }
-
 
 
 #[test]
@@ -196,18 +204,15 @@ fn test_route() {
         NotFound,
     }
 
-    fn route(path: &str) -> Page {
-        route!(path,
-            (/)                         => Page::Home;
-            (/"blog")                   => Page::BlogIndex;
-            (/"blog"/[id: u32])         => Page::BlogPost(id);
-            (/"blog"/[id: u32]/"edit")  => Page::BlogEdit(id);
-            (/"blog"/[id: u32]/[_])     => Page::BlogEdit(id);  // ignored slug
-            (/"u"/[handle])             => Page::User(handle);
-            (/"me"[/rest..])            => Page::Account(rest);
-        );
-        Page::NotFound
-    }
+    route_fn!(route -> Page {
+        (/)                         => Page::Home,
+        (/"blog")                   => Page::BlogIndex,
+        (/"blog"/[id: u32])         => Page::BlogPost(id),
+        (/"blog"/[id: u32]/"edit")  => Page::BlogEdit(id),
+        (/"blog"/[id: u32]/[_])     => Page::BlogEdit(id),  // ignored slug
+        (/"u"/[handle])             => Page::User(handle),
+        (/"me"[/rest..])            => Page::Account(rest),
+    }, Page::NotFound);
 
     assert_eq!(route("/"), Page::Home);
     assert_eq!(route("/blog"), Page::BlogIndex);
