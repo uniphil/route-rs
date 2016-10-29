@@ -26,7 +26,7 @@ macro_rules! seg {
 }
 
 macro_rules! split {
-    ( $s:ident, $p:ident, ( / $( $segment:tt )/ * ) ) => (
+    ( $s:ident, $p:ident, $term:ident, ( / $( $segment:tt )/ * ) ) => (
         $(
             $p += 1;  // advance past '/' sep
             if $p >= $s.len() {  // done so soon?
@@ -39,6 +39,11 @@ macro_rules! split {
             seg!($s, $p, end, $segment);
         )*
     );
+    ( $s:ident, $p:ident, $term:ident, ( / $( $segment:tt )/ * [ / $rest:ident .. ] ) ) => (
+        $term = false;
+        split!($s, $p, $term, ( / $( $segment )/ * ) );
+        let $rest = &$s[$p..];
+    );
 }
 
 macro_rules! route {
@@ -46,9 +51,11 @@ macro_rules! route {
         let mut p;
         $(
             loop {
+                let mut terminate = true;
                 p = 0;
-                split!($s, p, $path);
-                if !(p == $s.len() ||
+                split!($s, p, terminate, $path);
+                if terminate &&
+                   !(p == $s.len() ||
                      p == $s.len() - 1 && &$s[p..] == "/") {
                     break
                 }
@@ -111,8 +118,9 @@ fn test_split_macro() {
         let s = "/";
         let mut p = 0;
         let mut ok = false;
+        let mut terminate = true;
         loop {
-            split!(s, p, (/));
+            split!(s, p, terminate, (/));
             ok = true;
             break
         }
@@ -122,8 +130,9 @@ fn test_split_macro() {
         let s = "/uniphil";
         let mut p = 0;
         let mut ok = false;
+        let mut terminate = true;
         loop {
-            split!(s, p, (/[username]));
+            split!(s, p, terminate, (/[username]));
             ok = true;
             assert_eq!(username, "uniphil");
             break
@@ -134,8 +143,9 @@ fn test_split_macro() {
         let s = "/abc";
         let mut p = 0;
         let mut ok = false;
+        let mut terminate = true;
         loop {
-            split!(s, p, (/"abc"));
+            split!(s, p, terminate, (/"abc"));
             ok = true;
             break
         }
@@ -145,8 +155,9 @@ fn test_split_macro() {
         let s = "/abc/xyz";
         let mut p = 0;
         let mut ok = false;
+        let mut terminate = true;
         loop {
-            split!(s, p, (/"abc"/"xyz"));
+            split!(s, p, terminate, (/"abc"/"xyz"));
             ok = true;
             break
         }
@@ -156,12 +167,27 @@ fn test_split_macro() {
         let s = "/abc/xyz";
         let mut p = 0;
         let mut ok = false;
+        let mut terminate = true;
         loop {
-            split!(s, p, (/"abc"/"xy"));
+            split!(s, p, terminate, (/"abc"/"xy"));
             ok = true;
             break
         }
         assert_eq!(ok, false);
+    }
+    {
+        let s = "/abc/xyz/qrs";
+        let mut p = 0;
+        let mut ok = false;
+        let mut terminate = true;
+        loop {
+            split!(s, p, terminate, (/"abc"[/rest..]));
+            ok = true;
+            assert_eq!(rest, "/xyz/qrs");
+            break;
+        }
+        assert_eq!(terminate, false);
+        assert_eq!(ok, true);
     }
 }
 
@@ -175,6 +201,7 @@ fn test_route() {
         BlogPost(u32),
         BlogEdit(u32),
         User(&'a str),
+        Account(&'a str),
         NotFound,
     }
 
@@ -186,6 +213,7 @@ fn test_route() {
             (/"blog"/[id: u32]/"edit")  => Page::BlogEdit(id);
             (/"blog"/[id: u32]/[_])     => Page::BlogEdit(id);  // ignored slug
             (/"u"/[handle])             => Page::User(handle);
+            (/"me"[/rest..])            => Page::Account(rest);
         );
         Page::NotFound
     }
@@ -197,4 +225,5 @@ fn test_route() {
     assert_eq!(route("/u/uniphil"), Page::User("uniphil"));
     assert_eq!(route("/asdf"), Page::NotFound);
     assert_eq!(route("/blog/abc"), Page::NotFound);
+    assert_eq!(route("/me/a/b/c/d/e/f/g"), Page::Account("/a/b/c/d/e/f/g"));
 }
