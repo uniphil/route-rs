@@ -25,8 +25,43 @@ macro_rules! seg {
     );
 }
 
+macro_rules! split {
+    ( $s:ident, $p:ident, ( / $( $segment:tt )/ * ) ) => (
+        $(
+            $p += 1;  // advance past '/' sep
+            if $p >= $s.len() {  // done so soon?
+                break
+            }
+            let end = $s[$p..]
+                .find("/")
+                .map(|i| $p + i)
+                .unwrap_or($s.len());
+            seg!($s, $p, end, $segment);
+        )*
+    );
+}
+
+macro_rules! route {
+    ( $s:ident, $( $path:tt => $handle:expr ; )* ) => ({
+        let mut p;
+        $(
+            loop {
+                p = 0;
+                split!($s, p, $path);
+                if !(p == $s.len() ||
+                     p == $s.len() - 1 && &$s[p..] == "/") {
+                    break
+                }
+                return $handle;
+            }
+        )*
+    });
+}
+
+
+
 #[test]
-fn seg_test() {
+fn test_seg_macro() {
     {
         let mut ok = false;
         let mut p = 1;
@@ -70,24 +105,8 @@ fn seg_test() {
     }
 }
 
-macro_rules! split {
-    ( $s:ident, $p:ident, ( / $( $segment:tt )/ * ) ) => (
-        $(
-            $p += 1;  // advance past '/' sep
-            if $p >= $s.len() {  // done so soon?
-                break
-            }
-            let end = $s[$p..]
-                .find("/")
-                .map(|i| $p + i)
-                .unwrap_or($s.len());
-            seg!($s, $p, end, $segment);
-        )*
-    );
-}
-
 #[test]
-fn test_split() {
+fn test_split_macro() {
     {
         let s = "/";
         let mut p = 0;
@@ -146,24 +165,6 @@ fn test_split() {
     }
 }
 
-macro_rules! route {
-    ( $s:ident, $( $path:tt => $handle:expr ; )* ) => ({
-        let mut p;
-        $(
-            loop {
-                p = 0;
-                split!($s, p, $path);
-                if !(p == $s.len() ||
-                     p == $s.len() - 1 && &$s[p..] == "/") {
-                    break
-                }
-                return $handle;
-            }
-        )*
-    });
-}
-
-
 #[test]
 fn test_route() {
 
@@ -179,12 +180,12 @@ fn test_route() {
 
     fn route(path: &str) -> Page {
         route!(path,
-            (/) => Page::Home;
-            (/"blog") => Page::BlogIndex;
-            (/"blog"/[id: u32]) => Page::BlogPost(id);
-            (/"blog"/[id: u32]/"edit") => Page::BlogEdit(id);
-            (/"blog"/[id: u32]/[_]) => Page::BlogEdit(id);  // ignored slug
-            (/"u"/[handle]) => Page::User(handle);
+            (/)                         => Page::Home;
+            (/"blog")                   => Page::BlogIndex;
+            (/"blog"/[id: u32])         => Page::BlogPost(id);
+            (/"blog"/[id: u32]/"edit")  => Page::BlogEdit(id);
+            (/"blog"/[id: u32]/[_])     => Page::BlogEdit(id);  // ignored slug
+            (/"u"/[handle])             => Page::User(handle);
         );
         Page::NotFound
     }
