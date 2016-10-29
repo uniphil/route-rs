@@ -2,5 +2,10 @@
 name = "route"
 version = "0.1.0"
 authors = ["phil <uniphil@gmail.com>"]
+description = "Route URL paths with safe parameter extraction"
+repository = "https://github.com/uniphil/route-rs"
+readme = "readme.md"
+keywords = ["route", "path", "url", "parse"]
+license = "MIT"
 
 [dependencies]
