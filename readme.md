@@ -63,7 +63,8 @@ fn blog_post_handler(id: u32) -> IronResult<Response> {
 }
 
 fn route_handler(req: &mut Request) -> IronResult<Response> {
-    match route(req.url.path()) {
+    let path = format!("/{}", req.url.path().join("/"));
+    match route(&path) {
         Page::Home => home_handler(),
         Page::BlogPost(id) => blog_post_handler(id),
         ...
