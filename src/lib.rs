@@ -1,54 +1,30 @@
 macro_rules! seg {
     // ( $s: ident, $p: ident, ( * ) ) => ("star");
     // ( $s: ident, $p: ident, | ( * ) ) => ("last star");
-    ( $s: ident, $p: ident, ( $t:ty ) ) => (
-        $p += 1;  // leading '/'
-        if $p >= $s.len() {
-            break;
-        }
-        let seg_end = $s[$p..]
-            .find("/")
-            .map(|i| $p + i)
-            .unwrap_or($s.len());
-        if $s[$p..seg_end].parse::<$t>().is_ok() {
-            $p = seg_end;
+    ( $s:ident, $p:ident, $end:ident, ( $t:ty ) ) => (
+        if $s[$p..$end].parse::<$t>().is_ok() {
+            $p = $end;
         } else {
-            break;
+            break
         }
     );
     // ( $s: ident, $p: ident, | ( $t:ty ) ) => ("last type");
     // ( $s: ident, $p: ident, ( $n:ident : * ) ) => ("named star");
     // ( $s: ident, $p: ident, | ( $n:ident : * ) ) => ("named last star");
-    ( $s: ident, $p: ident, ( $n:ident : $t:ty ) ) => (
-        $p += 1;  // leading '/'
-        if $p >= $s.len() {
-            break;
-        }
-        let seg_end = $s[$p..]
-            .find("/")
-            .map(|i| $p + i)
-            .unwrap_or($s.len());
-        let parsed = $s[$p..seg_end].parse::<$t>();
+    ( $s:ident, $p:ident, $end:ident, ( $n:ident : $t:ty ) ) => (
+        let parsed = $s[$p..$end].parse::<$t>();
         if parsed.is_err() {
-            break;
+            break
         }
         let $n = parsed.unwrap();
-        $p = seg_end;
+        $p = $end;
     );
     // ( $s: ident, $p: ident, | ( $n:ident : $t:ty ) ) => ("named last type");
-    ( $s: ident, $p: ident, $e:expr ) => (
-        $p += 1;  // leading '/'
-        if $p >= $s.len() {
-            break;
-        }
-        let seg_end = $s[$p..]
-            .find("/")
-            .map(|i| $p + i)
-            .unwrap_or($s.len());
-        if &$s[$p..seg_end] == $e {
-            $p = seg_end;
+    ( $s:ident, $p:ident, $end:ident, $e:expr ) => (
+        if &$s[$p..$end] == $e {
+            $p = $end;
         } else {
-            break;
+            break
         }
     );
     // ( $s: ident, $p: ident, | $e:tt ) => (
@@ -65,47 +41,25 @@ macro_rules! seg {
 fn seg_test() {
     {
         let mut ok = false;
-        let mut p = 0;
+        let mut p = 1;
+        let end = 5;
         let s = "/asdf";
         loop {
-            seg!(s, p, "asdf");
+            seg!(s, p, end, "asdf");
             ok = true;
             break;
         }
         assert_eq!(ok, true, "segment matched");
         assert_eq!(p, 5);
-        loop {
-            seg!(s, p, "xyz");
-            unreachable!();
-        }
     }
 
     {
         let mut ok = false;
-        let mut ok2 = false;
-        let mut p = 0;
-        let s = "/abc/def";
-        loop {
-            seg!(s, p, "abc");
-            ok = true;
-            break;
-        }
-        assert_eq!(ok, true, "should match first segment");
-        loop {
-            seg!(s, p, "def");
-            ok2 = true;
-            break;
-        }
-        assert_eq!(ok2, true, "should match second segment");
-        assert_eq!(p, 8);
-    }
-
-    {
-        let mut ok = false;
-        let mut p = 0;
+        let mut p = 1;
+        let end = 5;
         let s = "/asdf";
         loop {
-            seg!(s, p, "fdsa");
+            seg!(s, p, end, "fdsa");
             ok = true;
             break;
         }
@@ -113,6 +67,7 @@ fn seg_test() {
         assert_eq!(p, 1);
     }
 }
+
 // fn seg() {
 //     let s = "";
 //     let mut p = 0;
@@ -139,7 +94,17 @@ macro_rules! split {
     // );
 
     ( $s:ident, $p:ident, ( $( $segment:tt ), * ) ) => (
-        $( seg!($s, $p, $segment); )*
+        $(
+            $p += 1;  // advance past '/' sep
+            if $p >= $s.len() {  // done so soon?
+                break
+            }
+            let end = $s[$p..]
+                .find("/")
+                .map(|i| $p + i)
+                .unwrap_or($s.len());
+            seg!($s, $p, end, $segment);
+        )*
     );
 
     // ( $s:ident, $p:ident, $( / $segment:tt )* | $rest:tt ) => (
@@ -197,8 +162,9 @@ macro_rules! route {
             loop {
                 p = 0;
                 split!($s, p, $path);
-                if p != $s.len() {
-                    break;
+                if !(p == $s.len() ||
+                     p == $s.len() - 1 && &$s[p..] == "/") {
+                    break
                 }
                 return $handle;
             }
@@ -219,7 +185,7 @@ enum Page {
 
 fn route<'a>(path: &'a str) -> Page {
     route!(path,
-        ("home") => Page::Home;
+        () => Page::Home;
         ("blog") => Page::BlogIndex;
         ("blog", (id: u32)) => Page::BlogPost(id);
         ("blog", (id: u32), "edit") => Page::BlogEdit(id);
@@ -230,7 +196,7 @@ fn route<'a>(path: &'a str) -> Page {
 
 #[test]
 fn test_route() {
-    assert_eq!(route("/home"), Page::Home);
+    assert_eq!(route("/"), Page::Home);
     assert_eq!(route("/blog"), Page::BlogIndex);
     assert_eq!(route("/blog/42"), Page::BlogPost(42));
     assert_eq!(route("/blog/42/edit"), Page::BlogEdit(42));
