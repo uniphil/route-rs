@@ -1,4 +1,15 @@
 macro_rules! seg {
+    ( $s:ident, $p:ident, $segment:tt ) => (
+        $p += 1;  // advance past '/' sep
+        if $p >= $s.len() {  // done so soon?
+            break
+        }
+        let end = $s[$p..]
+            .find("/")
+            .map(|i| $p + i)
+            .unwrap_or($s.len());
+        seg!($s, $p, end, $segment);
+    );
     ( $s:ident, $p:ident, $end:ident, [_] ) => (
         $p = $end;
     );
@@ -26,22 +37,15 @@ macro_rules! seg {
 }
 
 macro_rules! split {
-    ( $s:ident, $p:ident, $term:ident, ( / $( $segment:tt )/ * ) ) => (
-        $(
-            $p += 1;  // advance past '/' sep
-            if $p >= $s.len() {  // done so soon?
-                break
-            }
-            let end = $s[$p..]
-                .find("/")
-                .map(|i| $p + i)
-                .unwrap_or($s.len());
-            seg!($s, $p, end, $segment);
-        )*
+    ( $s:ident, $p:ident, ( / $( $segment:tt )/ * ) ) => (
+        $( seg!($s, $p, $segment); )*
+        if !($p == $s.len() ||
+             $p == $s.len() - 1 && &$s[$p..] == "/") {
+            break
+        }
     );
-    ( $s:ident, $p:ident, $term:ident, ( / $( $segment:tt )/ * [ / $rest:ident .. ] ) ) => (
-        $term = false;
-        split!($s, $p, $term, ( / $( $segment )/ * ) );
+    ( $s:ident, $p:ident, ( / $( $segment:tt )/ * [ / $rest:ident .. ] ) ) => (
+        $( seg!($s, $p, $segment); )*
         let $rest = &$s[$p..];
     );
 }
@@ -51,14 +55,8 @@ macro_rules! route {
         let mut p;
         $(
             loop {
-                let mut terminate = true;
                 p = 0;
-                split!($s, p, terminate, $path);
-                if terminate &&
-                   !(p == $s.len() ||
-                     p == $s.len() - 1 && &$s[p..] == "/") {
-                    break
-                }
+                split!($s, p, $path);
                 return $handle;
             }
         )*
@@ -118,9 +116,8 @@ fn test_split_macro() {
         let s = "/";
         let mut p = 0;
         let mut ok = false;
-        let mut terminate = true;
         loop {
-            split!(s, p, terminate, (/));
+            split!(s, p, (/));
             ok = true;
             break
         }
@@ -130,9 +127,8 @@ fn test_split_macro() {
         let s = "/uniphil";
         let mut p = 0;
         let mut ok = false;
-        let mut terminate = true;
         loop {
-            split!(s, p, terminate, (/[username]));
+            split!(s, p, (/[username]));
             ok = true;
             assert_eq!(username, "uniphil");
             break
@@ -143,9 +139,8 @@ fn test_split_macro() {
         let s = "/abc";
         let mut p = 0;
         let mut ok = false;
-        let mut terminate = true;
         loop {
-            split!(s, p, terminate, (/"abc"));
+            split!(s, p, (/"abc"));
             ok = true;
             break
         }
@@ -155,9 +150,8 @@ fn test_split_macro() {
         let s = "/abc/xyz";
         let mut p = 0;
         let mut ok = false;
-        let mut terminate = true;
         loop {
-            split!(s, p, terminate, (/"abc"/"xyz"));
+            split!(s, p, (/"abc"/"xyz"));
             ok = true;
             break
         }
@@ -167,9 +161,8 @@ fn test_split_macro() {
         let s = "/abc/xyz";
         let mut p = 0;
         let mut ok = false;
-        let mut terminate = true;
         loop {
-            split!(s, p, terminate, (/"abc"/"xy"));
+            split!(s, p, (/"abc"/"xy"));
             ok = true;
             break
         }
@@ -179,14 +172,12 @@ fn test_split_macro() {
         let s = "/abc/xyz/qrs";
         let mut p = 0;
         let mut ok = false;
-        let mut terminate = true;
         loop {
-            split!(s, p, terminate, (/"abc"[/rest..]));
+            split!(s, p, (/"abc"[/rest..]));
             ok = true;
             assert_eq!(rest, "/xyz/qrs");
             break;
         }
-        assert_eq!(terminate, false);
         assert_eq!(ok, true);
     }
 }
