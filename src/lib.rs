@@ -93,7 +93,7 @@ macro_rules! split {
     //     }
     // );
 
-    ( $s:ident, $p:ident, ( $( $segment:tt )/ * ) ) => (
+    ( $s:ident, $p:ident, ( / $( $segment:tt )/ * ) ) => (
         $(
             $p += 1;  // advance past '/' sep
             if $p >= $s.len() {  // done so soon?
@@ -114,12 +114,24 @@ macro_rules! split {
 #[test]
 fn test_split() {
     {
+        let s = "/";
+        let mut p = 0;
+        let mut ok = false;
+        loop {
+            split!(s, p, (/));
+            ok = true;
+            break
+        }
+        assert_eq!(ok, true);
+    }
+    {
         let s = "/abc";
         let mut p = 0;
         let mut ok = false;
         loop {
-            split!(s, p, ("abc"));
+            split!(s, p, (/"abc"));
             ok = true;
+            break
         }
         assert_eq!(ok, true);
     }
@@ -128,8 +140,9 @@ fn test_split() {
         let mut p = 0;
         let mut ok = false;
         loop {
-            split!(s, p, ("abc" / "xyz"));
+            split!(s, p, (/"abc"/"xyz"));
             ok = true;
+            break
         }
         assert_eq!(ok, true);
     }
@@ -138,8 +151,9 @@ fn test_split() {
         let mut p = 0;
         let mut ok = false;
         loop {
-            split!(s, p, ("abc" / "xy"));
+            split!(s, p, (/"abc"/"xy"));
             ok = true;
+            break
         }
         assert_eq!(ok, false);
     }
@@ -185,11 +199,11 @@ enum Page {
 
 fn route<'a>(path: &'a str) -> Page {
     route!(path,
-        () => Page::Home;
-        ("blog") => Page::BlogIndex;
-        ("blog" / (id: u32)) => Page::BlogPost(id);
-        ("blog" / (id: u32) / "edit") => Page::BlogEdit(id);
-        ("u" / (handle: String)) => Page::User(handle);
+        (/) => Page::Home;
+        (/"blog") => Page::BlogIndex;
+        (/"blog"/(id: u32)) => Page::BlogPost(id);
+        (/"blog"/(id: u32)/"edit") => Page::BlogEdit(id);
+        (/"u"/(handle: String)) => Page::User(handle);
     );
     Page::NotFound
 }
