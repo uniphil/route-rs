@@ -1,6 +1,4 @@
 macro_rules! seg {
-    // ( $s: ident, $p: ident, ( * ) ) => ("star");
-    // ( $s: ident, $p: ident, | ( * ) ) => ("last star");
     ( $s:ident, $p:ident, $end:ident, ( $t:ty ) ) => (
         if $s[$p..$end].parse::<$t>().is_ok() {
             $p = $end;
@@ -8,9 +6,6 @@ macro_rules! seg {
             break
         }
     );
-    // ( $s: ident, $p: ident, | ( $t:ty ) ) => ("last type");
-    // ( $s: ident, $p: ident, ( $n:ident : * ) ) => ("named star");
-    // ( $s: ident, $p: ident, | ( $n:ident : * ) ) => ("named last star");
     ( $s:ident, $p:ident, $end:ident, ( $n:ident : $t:ty ) ) => (
         let parsed = $s[$p..$end].parse::<$t>();
         if parsed.is_err() {
@@ -19,7 +14,6 @@ macro_rules! seg {
         let $n = parsed.unwrap();
         $p = $end;
     );
-    // ( $s: ident, $p: ident, | ( $n:ident : $t:ty ) ) => ("named last type");
     ( $s:ident, $p:ident, $end:ident, $e:expr ) => (
         if &$s[$p..$end] == $e {
             $p = $end;
@@ -27,16 +21,8 @@ macro_rules! seg {
             break
         }
     );
-    // ( $s: ident, $p: ident, | $e:tt ) => (
-    //     $p += 1;
-    //     if $p >= $s.len() {
-    //         break;
-    //     }
-    //     if &$s[$p..] != $e {
-    //         break;
-    //     }
-    // );
 }
+
 #[test]
 fn seg_test() {
     {
@@ -68,31 +54,7 @@ fn seg_test() {
     }
 }
 
-// fn seg() {
-//     let s = "";
-//     let mut p = 0;
-//     "||| tags";
-//     seg!(s, p, "a");
-//     seg!(s, p, |"b");
-//     // "||| eaters";
-//     // seg!(s, p, (u32));
-//     // seg!(s, p, |(u32));
-//     // seg!(s, p, (*));
-//     // seg!(s, p, |(*));
-//     // "||| extractors";
-//     // seg!(s, p, (z: u32));
-//     // seg!(s, p, |(z: u32));
-//     // seg!(s, p, (z: *));
-//     // seg!(s, p, |(z: *));
-// }
-
 macro_rules! split {
-    // ( $s:ident, $p:ident, / ) => (
-    //     if $s == "" {
-    //         "yay"
-    //     }
-    // );
-
     ( $s:ident, $p:ident, ( / $( $segment:tt )/ * ) ) => (
         $(
             $p += 1;  // advance past '/' sep
@@ -106,11 +68,8 @@ macro_rules! split {
             seg!($s, $p, end, $segment);
         )*
     );
-
-    // ( $s:ident, $p:ident, $( / $segment:tt )* | $rest:tt ) => (
-    //     $( seg!($s, $p, $segment); )* seg!($s, $p, |$rest)
-    // );
 }
+
 #[test]
 fn test_split() {
     {
@@ -158,16 +117,6 @@ fn test_split() {
         assert_eq!(ok, false);
     }
 }
-// fn split() {
-//     let s = "";
-//     let mut p = 0;
-//     split!(s, p, /);
-//     split!(s, p, /"a");
-//     split!(s, p, /"a"/"b");
-//     // split!(s, p, /"a"/(u32));
-//     // split!(s, p, /"a"/(id: u32));
-//     // split!(s, p, /"a"|(path: *));
-// }
 
 macro_rules! route {
     ( $s:ident, $( $path:tt => $handle:expr ; )* ) => ({
@@ -187,29 +136,30 @@ macro_rules! route {
 }
 
 
-#[derive(Debug, PartialEq, Eq)]
-enum Page {
-    Home,
-    BlogIndex,
-    BlogPost(u32),
-    BlogEdit(u32),
-    User(String),
-    NotFound,
-}
-
-fn route<'a>(path: &'a str) -> Page {
-    route!(path,
-        (/) => Page::Home;
-        (/"blog") => Page::BlogIndex;
-        (/"blog"/(id: u32)) => Page::BlogPost(id);
-        (/"blog"/(id: u32)/"edit") => Page::BlogEdit(id);
-        (/"u"/(handle: String)) => Page::User(handle);
-    );
-    Page::NotFound
-}
-
 #[test]
 fn test_route() {
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum Page {
+        Home,
+        BlogIndex,
+        BlogPost(u32),
+        BlogEdit(u32),
+        User(String),
+        NotFound,
+    }
+
+    fn route<'a>(path: &'a str) -> Page {
+        route!(path,
+            (/) => Page::Home;
+            (/"blog") => Page::BlogIndex;
+            (/"blog"/(id: u32)) => Page::BlogPost(id);
+            (/"blog"/(id: u32)/"edit") => Page::BlogEdit(id);
+            (/"u"/(handle: String)) => Page::User(handle);
+        );
+        Page::NotFound
+    }
+
     assert_eq!(route("/"), Page::Home);
     assert_eq!(route("/blog"), Page::BlogIndex);
     assert_eq!(route("/blog/42"), Page::BlogPost(42));
