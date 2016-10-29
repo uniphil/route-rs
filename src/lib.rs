@@ -1,16 +1,16 @@
 macro_rules! seg {
-    ( $s:ident, $p:ident, $end:ident, ( $n:ident ) ) => (
+    ( $s:ident, $p:ident, $end:ident, [ $n:ident ] ) => (
         let $n = &$s[$p..$end];
         $p = $end;
     );
-    ( $s:ident, $p:ident, $end:ident, ( $t:ty ) ) => (
+    ( $s:ident, $p:ident, $end:ident, [ $t:ty ] ) => (
         if $s[$p..$end].parse::<$t>().is_ok() {
             $p = $end;
         } else {
             break
         }
     );
-    ( $s:ident, $p:ident, $end:ident, ( $n:ident : $t:ty ) ) => (
+    ( $s:ident, $p:ident, $end:ident, [ $n:ident : $t:ty ] ) => (
         let $n: $t;
         match $s[$p..$end].parse::<$t>() {
             Ok(v) =>
@@ -37,7 +37,7 @@ fn seg_test() {
         let end = 5;
         let s = "/asdf";
         loop {
-            seg!(s, p, end, (hello));
+            seg!(s, p, end, [hello]);
             ok = true;
             assert_eq!(hello, "asdf");
             break;
@@ -108,7 +108,7 @@ fn test_split() {
         let mut p = 0;
         let mut ok = false;
         loop {
-            split!(s, p, (/(username)));
+            split!(s, p, (/[username]));
             ok = true;
             assert_eq!(username, "uniphil");
             break
@@ -185,9 +185,9 @@ fn test_route() {
         route!(path,
             (/) => Page::Home;
             (/"blog") => Page::BlogIndex;
-            (/"blog"/(id: u32)) => Page::BlogPost(id);
-            (/"blog"/(id: u32)/"edit") => Page::BlogEdit(id);
-            (/"u"/(handle)) => Page::User(handle);
+            (/"blog"/[id: u32]) => Page::BlogPost(id);
+            (/"blog"/[id: u32]/"edit") => Page::BlogEdit(id);
+            (/"u"/[handle]) => Page::User(handle);
         );
         Page::NotFound
     }
