@@ -1,3 +1,4 @@
+#[macro_export]
 macro_rules! seg {
     ( $s:ident, $p:ident, $segment:tt ) => (
         $p += 1;  // advance past '/' sep
@@ -36,6 +37,7 @@ macro_rules! seg {
     );
 }
 
+#[macro_export]
 macro_rules! split {
     ( $s:ident, $p:ident, ( / $( $segment:tt )/ * ) ) => (
         $( seg!($s, $p, $segment); )*
