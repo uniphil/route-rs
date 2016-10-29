@@ -50,6 +50,7 @@ macro_rules! split {
     );
 }
 
+#[macro_export]
 macro_rules! route_fn {
     ( $f:ident -> $o:ident {
         $( $m:tt => $handle:expr , )*
