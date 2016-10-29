@@ -1,14 +1,10 @@
 macro_rules! seg {
+    ( $s:ident, $p:ident, $end:ident, [_] ) => (
+        $p = $end;
+    );
     ( $s:ident, $p:ident, $end:ident, [ $n:ident ] ) => (
         let $n = &$s[$p..$end];
         $p = $end;
-    );
-    ( $s:ident, $p:ident, $end:ident, [ $t:ty ] ) => (
-        if $s[$p..$end].parse::<$t>().is_ok() {
-            $p = $end;
-        } else {
-            break
-        }
     );
     ( $s:ident, $p:ident, $end:ident, [ $n:ident : $t:ty ] ) => (
         let $n: $t;
@@ -187,6 +183,7 @@ fn test_route() {
             (/"blog") => Page::BlogIndex;
             (/"blog"/[id: u32]) => Page::BlogPost(id);
             (/"blog"/[id: u32]/"edit") => Page::BlogEdit(id);
+            (/"blog"/[id: u32]/[_]) => Page::BlogEdit(id);  // ignored slug
             (/"u"/[handle]) => Page::User(handle);
         );
         Page::NotFound
