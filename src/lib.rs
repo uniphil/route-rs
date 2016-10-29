@@ -7,11 +7,13 @@ macro_rules! seg {
         }
     );
     ( $s:ident, $p:ident, $end:ident, ( $n:ident : $t:ty ) ) => (
-        let parsed = $s[$p..$end].parse::<$t>();
-        if parsed.is_err() {
-            break
+        let $n: $t;
+        match $s[$p..$end].parse::<$t>() {
+            Ok(v) =>
+                $n = v,
+            Err(_) =>
+                break,
         }
-        let $n = parsed.unwrap();
         $p = $end;
     );
     ( $s:ident, $p:ident, $end:ident, $e:expr ) => (
