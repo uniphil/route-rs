@@ -93,7 +93,7 @@ macro_rules! split {
     //     }
     // );
 
-    ( $s:ident, $p:ident, ( $( $segment:tt ), * ) ) => (
+    ( $s:ident, $p:ident, ( $( $segment:tt )/ * ) ) => (
         $(
             $p += 1;  // advance past '/' sep
             if $p >= $s.len() {  // done so soon?
@@ -128,7 +128,7 @@ fn test_split() {
         let mut p = 0;
         let mut ok = false;
         loop {
-            split!(s, p, ("abc", "xyz"));
+            split!(s, p, ("abc" / "xyz"));
             ok = true;
         }
         assert_eq!(ok, true);
@@ -138,7 +138,7 @@ fn test_split() {
         let mut p = 0;
         let mut ok = false;
         loop {
-            split!(s, p, ("abc", "xy"));
+            split!(s, p, ("abc" / "xy"));
             ok = true;
         }
         assert_eq!(ok, false);
@@ -187,9 +187,9 @@ fn route<'a>(path: &'a str) -> Page {
     route!(path,
         () => Page::Home;
         ("blog") => Page::BlogIndex;
-        ("blog", (id: u32)) => Page::BlogPost(id);
-        ("blog", (id: u32), "edit") => Page::BlogEdit(id);
-        ("u", (handle: String)) => Page::User(handle);
+        ("blog" / (id: u32)) => Page::BlogPost(id);
+        ("blog" / (id: u32) / "edit") => Page::BlogEdit(id);
+        ("u" / (handle: String)) => Page::User(handle);
     );
     Page::NotFound
 }
