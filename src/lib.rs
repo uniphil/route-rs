@@ -1,4 +1,8 @@
 macro_rules! seg {
+    ( $s:ident, $p:ident, $end:ident, ( $n:ident ) ) => (
+        let $n = &$s[$p..$end];
+        $p = $end;
+    );
     ( $s:ident, $p:ident, $end:ident, ( $t:ty ) ) => (
         if $s[$p..$end].parse::<$t>().is_ok() {
             $p = $end;
@@ -27,6 +31,20 @@ macro_rules! seg {
 
 #[test]
 fn seg_test() {
+    {
+        let mut ok = false;
+        let mut p = 1;
+        let end = 5;
+        let s = "/asdf";
+        loop {
+            seg!(s, p, end, (hello));
+            ok = true;
+            assert_eq!(hello, "asdf");
+            break;
+        }
+        assert_eq!(ok, true);
+    }
+
     {
         let mut ok = false;
         let mut p = 1;
@@ -81,6 +99,18 @@ fn test_split() {
         loop {
             split!(s, p, (/));
             ok = true;
+            break
+        }
+        assert_eq!(ok, true);
+    }
+    {
+        let s = "/uniphil";
+        let mut p = 0;
+        let mut ok = false;
+        loop {
+            split!(s, p, (/(username)));
+            ok = true;
+            assert_eq!(username, "uniphil");
             break
         }
         assert_eq!(ok, true);
@@ -142,22 +172,22 @@ macro_rules! route {
 fn test_route() {
 
     #[derive(Debug, PartialEq, Eq)]
-    enum Page {
+    enum Page<'a> {
         Home,
         BlogIndex,
         BlogPost(u32),
         BlogEdit(u32),
-        User(String),
+        User(&'a str),
         NotFound,
     }
 
-    fn route<'a>(path: &'a str) -> Page {
+    fn route(path: &str) -> Page {
         route!(path,
             (/) => Page::Home;
             (/"blog") => Page::BlogIndex;
             (/"blog"/(id: u32)) => Page::BlogPost(id);
             (/"blog"/(id: u32)/"edit") => Page::BlogEdit(id);
-            (/"u"/(handle: String)) => Page::User(handle);
+            (/"u"/(handle)) => Page::User(handle);
         );
         Page::NotFound
     }
@@ -166,7 +196,7 @@ fn test_route() {
     assert_eq!(route("/blog"), Page::BlogIndex);
     assert_eq!(route("/blog/42"), Page::BlogPost(42));
     assert_eq!(route("/blog/42/edit"), Page::BlogEdit(42));
-    assert_eq!(route("/u/uniphil"), Page::User("uniphil".to_string()));
+    assert_eq!(route("/u/uniphil"), Page::User("uniphil"));
     assert_eq!(route("/asdf"), Page::NotFound);
     assert_eq!(route("/blog/abc"), Page::NotFound);
 }
