@@ -7,70 +7,73 @@ This crate is my attempt at a safe helper for mapping URL routes to handlers for
 
 There are several routing libraries already available, but all of the ones I have been able to find share a common problem: path patterns are defined as strings, and URL parameters get parsed out at runtime and stashed in some kind of `Map` that handlers have to `.get()` and `.unwrap()` to access. I want to extract parameters without unwrapping, and I want rust's type system to ensure that I'm not making mistakes!
 
-The current form is a macro, `route_fn!`, which creates a function mapping a `path: &str` to a member of an `enum` that you provide:
+
+## Setup
+
+in Cargo.toml:
+
+```toml
+[dependencies]
+route = "0.2.0"
+```
+
+`route` just exports a the macro `route!`, so you need to `#[macro use]` it:
 
 ```rust
 #[macro use]
 extern crate route;
-
-#[derive(Debug, PartialEq, Eq)]
-enum Page<'a> {
-    Home,
-    BlogIndex,
-    BlogPost(u32),
-    BlogEdit(u32),
-    User(&'a str),
-    Account(&'a str),
-    NotFound,
-}
-
-route_fn!(route -> Page {
-    (/)                         => Page::Home,
-    (/"blog")                   => Page::BlogIndex,
-    (/"blog"/[id: u32])         => Page::BlogPost(id),
-    (/"blog"/[id: u32]/"edit")  => Page::BlogEdit(id),
-    (/"blog"/[id: u32]/[_])     => Page::BlogEdit(id),  // ignored slug
-    (/"u"/[handle])             => Page::User(handle),
-    (/"me"[/rest..])            => Page::Account(rest),
-}, Page::NotFound);
 ```
 
-You can now use the function `Fn(&str) -> Page` called 'route' created by the macro to match paths:
+
+## Usage
+
+Suppose you have some HTTP request/response server setup like
 
 ```rust
-#[test]
-fn test_route() {
-    assert_eq!(route("/"), Page::Home);
-    assert_eq!(route("/blog"), Page::BlogIndex);
-    assert_eq!(route("/blog/42"), Page::BlogPost(42));
-    assert_eq!(route("/blog/42/edit"), Page::BlogEdit(42));
-    assert_eq!(route("/u/uniphil"), Page::User("uniphil"));
-    assert_eq!(route("/asdf"), Page::NotFound);
-    assert_eq!(route("/blog/abc"), Page::NotFound);
-    assert_eq!(route("/me/a/b/c/d/e/f/g"), Page::Account("/a/b/c/d/e/f/g"));
+
+// imaginary request/response structs provided by the framework:
+
+struct Request<'a> {
+    path: &'a str,
+}
+
+type Response = String;
+
+
+// application handlers that we need to route:
+// Note that some handlers take extra parameters that we hope to fill from the path!
+
+fn home(req: &Request) -> Response {
+    "home".to_string()
+}
+
+fn blog_post(req: &Request, id: u32) -> Response {
+    format!("blog: {}", id)
+}
+
+fn account(req: &Request, subpath: &str) -> Response {
+    format!("account -- subpath: {}", subpath)
 }
 ```
 
-`route()` will return a member of `Page`, so if you want to map it to, say, an Iron handler:
+Then you could set up a routing handler like:
 
 ```rust
-fn home_handler() -> IronResult<Response> {
-    Ok(Response::with((status::Ok, "Hello world!")))
+fn handle_route(req: &Request) -> Response {
+    route!(req.path, {
+        (/)                 => home(req);
+        (/"blog"/[id: u32]) => blog_post(req, id);
+        (/"me"[/rest..])    => account(req, rest);
+    });
+    Response::from("not found")
 }
+```
 
-fn blog_post_handler(id: u32) -> IronResult<Response> {
-    Ok(Response::with((status::Ok, format!("This is blog post #{}", id))))
-}
+And you're set!
 
-fn route_handler(req: &mut Request) -> IronResult<Response> {
-    let path = format!("/{}", req.url.path().join("/"));
-    match route(&path) {
-        Page::Home => home_handler(),
-        Page::BlogPost(id) => blog_post_handler(id),
-        ...
-    }
-}
-
-fn main() {
-    Iron::new(route_handler).http("localhost:3000").unwrap();
-}
+```rust
+assert_eq!(&handle_route(&Request { path: "/" }), "home");
+assert_eq!(&handle_route(&Request { path: "/blog/42" }), "blog: 42");
+assert_eq!(&handle_route(&Request { path: "/me/a/b/c" }), "account -- subpath: /a/b/c");
+assert_eq!(&handle_route(&Request { path: "/foo" }), "not found");
+```

@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! seg {
-    ( $s:ident, $p:ident, $segment:tt ) => (
+    ( $s:expr, $p:ident, $segment:tt ) => (
         $p += 1;  // advance past '/' sep
         if $p >= $s.len() {  // done so soon?
             break
@@ -11,14 +11,14 @@ macro_rules! seg {
             .unwrap_or($s.len());
         seg!($s, $p, end, $segment);
     );
-    ( $s:ident, $p:ident, $end:ident, [_] ) => (
+    ( $s:expr, $p:ident, $end:ident, [_] ) => (
         $p = $end;
     );
-    ( $s:ident, $p:ident, $end:ident, [ $n:ident ] ) => (
+    ( $s:expr, $p:ident, $end:ident, [ $n:ident ] ) => (
         let $n = &$s[$p..$end];
         $p = $end;
     );
-    ( $s:ident, $p:ident, $end:ident, [ $n:ident : $t:ty ] ) => (
+    ( $s:expr, $p:ident, $end:ident, [ $n:ident : $t:ty ] ) => (
         let $n: $t;
         match $s[$p..$end].parse::<$t>() {
             Ok(v) =>
@@ -28,7 +28,7 @@ macro_rules! seg {
         }
         $p = $end;
     );
-    ( $s:ident, $p:ident, $end:ident, $e:expr ) => (
+    ( $s:expr, $p:ident, $end:ident, $e:expr ) => (
         if &$s[$p..$end] == $e {
             $p = $end;
         } else {
@@ -39,40 +39,37 @@ macro_rules! seg {
 
 #[macro_export]
 macro_rules! split {
-    ( $s:ident, $p:ident, ( / $( $segment:tt )/ * ) ) => (
+    ( $s:expr, $p:ident, ( / $( $segment:tt )/ * ) ) => (
         $( seg!($s, $p, $segment); )*
         if !($p == $s.len() ||
              $p == $s.len() - 1 && &$s[$p..] == "/") {
             break
         }
     );
-    ( $s:ident, $p:ident, ( / $( $segment:tt )/ * [ / $rest:ident .. ] ) ) => (
+    ( $s:expr, $p:ident, ( / $( $segment:tt )/ * [ / $rest:ident .. ] ) ) => (
         $( seg!($s, $p, $segment); )*
         let $rest = &$s[$p..];
     );
 }
 
 #[macro_export]
-macro_rules! route_fn {
-    ( $f:ident -> $o:ident {
-        $( $m:tt => $handle:expr , )*
-    }, $def:path ) => (
-        fn $f(path: &str) -> $o {
-            $(loop {
-                let mut p = 0;
-                split!(path, p, $m);
-                return $handle;
-            })*
-            $def
-        }
+macro_rules! route {
+    ( $path:expr , {
+        $( $m:tt => $handle:expr ; )*
+    } ) => (
+        $(loop {
+            let mut p = 0;
+            split!($path, p, $m);
+            return $handle;
+        })*
     );
-    ( $f:ident -> $o:ident {
-        $( $m:tt => $handle:expr ), *    // missing trailing comma
-    }, $def:path ) => (
-        route_fn!($f -> $o {
+    ( $path:expr , {
+        $( $m:tt => $handle:expr ); *    // missing trailing comma
+    } ) => (
+        route_fn!($path, {
             $( $m => $handle , )*
-        }, $def)
-    )
+        })
+    );
 }
 
 
@@ -196,33 +193,35 @@ fn test_split_macro() {
 #[test]
 fn test_route() {
 
-    #[derive(Debug, PartialEq, Eq)]
-    enum Page<'a> {
-        Home,
-        BlogIndex,
-        BlogPost(u32),
-        BlogEdit(u32),
-        User(&'a str),
-        Account(&'a str),
-        NotFound,
+    struct Request<'a> {
+        path: &'a str,
     }
 
-    route_fn!(route -> Page {
-        (/)                         => Page::Home,
-        (/"blog")                   => Page::BlogIndex,
-        (/"blog"/[id: u32])         => Page::BlogPost(id),
-        (/"blog"/[id: u32]/"edit")  => Page::BlogEdit(id),
-        (/"blog"/[id: u32]/[_])     => Page::BlogEdit(id),  // ignored slug
-        (/"u"/[handle])             => Page::User(handle),
-        (/"me"[/rest..])            => Page::Account(rest),
-    }, Page::NotFound);
+    type Response = String;
 
-    assert_eq!(route("/"), Page::Home);
-    assert_eq!(route("/blog"), Page::BlogIndex);
-    assert_eq!(route("/blog/42"), Page::BlogPost(42));
-    assert_eq!(route("/blog/42/edit"), Page::BlogEdit(42));
-    assert_eq!(route("/u/uniphil"), Page::User("uniphil"));
-    assert_eq!(route("/asdf"), Page::NotFound);
-    assert_eq!(route("/blog/abc"), Page::NotFound);
-    assert_eq!(route("/me/a/b/c/d/e/f/g"), Page::Account("/a/b/c/d/e/f/g"));
+    fn home(req: &Request) -> Response {
+        "home".to_string()
+    }
+
+    fn blog_post(req: &Request, id: u32) -> Response {
+        format!("blog: {}", id)
+    }
+
+    fn account(req: &Request, subpath: &str) -> Response {
+        format!("account -- subpath: {}", subpath)
+    }
+
+    fn handle_route(req: &Request) -> Response {
+        route!(req.path, {
+            (/)                 => home(req);
+            (/"blog"/[id: u32]) => blog_post(req, id);
+            (/"me"[/rest..])    => account(req, rest);
+        });
+        Response::from("not found")
+    }
+
+    assert_eq!(&handle_route(&Request { path: "/" }), "home");
+    assert_eq!(&handle_route(&Request { path: "/blog/42" }), "blog: 42");
+    assert_eq!(&handle_route(&Request { path: "/me/a/b/c" }), "account -- subpath: /a/b/c");
+    assert_eq!(&handle_route(&Request { path: "/foo" }), "not found");
 }
