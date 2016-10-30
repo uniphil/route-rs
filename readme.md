@@ -72,8 +72,15 @@ fn handle_route(req: &Request) -> Response {
 And you're set!
 
 ```rust
-assert_eq!(&handle_route(&Request { path: "/" }), "home");
-assert_eq!(&handle_route(&Request { path: "/blog/42" }), "blog: 42");
-assert_eq!(&handle_route(&Request { path: "/me/a/b/c" }), "account -- subpath: /a/b/c");
-assert_eq!(&handle_route(&Request { path: "/foo" }), "not found");
+assert_eq!(handle_route(&Request { path: "/" }),
+    Response::from("home"));
+
+assert_eq!(handle_route(&Request { path: "/blog/42" }),
+    Response::from("blog: 42"));
+
+assert_eq!(handle_route(&Request { path: "/me/a/b/c" }),
+    Response::from("account -- subpath: /a/b/c"));
+
+assert_eq!(handle_route(&Request { path: "/foo" }),
+    Response::from("not found"));
 ```
